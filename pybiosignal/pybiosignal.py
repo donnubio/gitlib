@@ -32,4 +32,4 @@ def signal_segment( t,y, t1, t2 ):
 
 
 def fun1(  ):
-    print('dddddd')
+    print('dddddd2')
