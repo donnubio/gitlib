@@ -3,7 +3,7 @@ from setuptools import setup
 from pybiosignal import __version__
 
 setup(
-    name='my_pip_package',
+    name='pybiosignal',
     version=__version__,
 
     url='https://github.com/donnubio/gitlib',
