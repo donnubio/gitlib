@@ -1,9 +1,8 @@
 __version__ = 'dev'
 
-import numpy as np
+#import numpy as np
 #import scipy.io as sio
 from scipy import signal
-
 
 def filt_butter(y, fs, fc, ord=2, ftype='lowpass'):
     #функція filt_butter здійснює цифрову фільтрацію сигнала
@@ -22,7 +21,6 @@ def filt_butter(y, fs, fc, ord=2, ftype='lowpass'):
     b, a = signal.butter(ord, fc_nrm, btype=ftype)
     y = signal.filtfilt(b, a, y)
     return y
-
 
 def signal_segment( t,y, t1, t2 ):
     i = np.where( (t>=t1) & (t<=t2) )
