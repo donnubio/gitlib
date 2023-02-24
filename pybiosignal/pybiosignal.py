@@ -29,7 +29,3 @@ def signal_segment( t,y, t1, t2 ):
     segm_t=t[i]
     segm_y=y[i]
     return(segm_t, segm_y)
-
-
-def fun1(  ):
-    print('dddddd2')
