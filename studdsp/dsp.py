@@ -57,7 +57,7 @@ def ФільтрБаттерворта(y, fs, fc, ord=2, ftype='lowpass'):
   yf = signal.filtfilt(b, a, y)
   return yf  
 
-def getHeartRate(yf, частота_дискретизації=500, peaks_max=1):
+def getHeartRate(t, yf, частота_дискретизації=500, peaks_max=1):
   # # завантажуємо сигнал фотоплетизмограми (ФПГ) в масиви t (час в сек), y ("об'єм крові в пальці", що міняється в часі)
   # # частота дискретизаціх сигналу 500 Гц
   # # в експерименті піддослідний почав пити чай на 100 секунді, завершив пити на 500 (?) секунді
@@ -79,7 +79,7 @@ def getHeartRate(yf, частота_дискретизації=500, peaks_max=1)
   tPP = tP[:-1]
   tHR = tPP
   HR = 60 / PP
-  return(t,yf, tP,P, tPP,PP, tHR,HR)
+  return(tP,P, tPP,PP, tHR,HR)
 
 
 def signal_segment(t,y,t1,t2,time_from_zero=0):
@@ -132,7 +132,11 @@ def BPlot(x,y,label=None,h=150,w=1000,marker=None,**kargs):
 
 ################################################################################
 
-def PPlot(data=None, x=None,y=None, data_err=None, err_up=None, err_dw=None, abserr=1, label=None, h=300, w=None, **kargs):
+def PPlot(x=None, y=None, 
+          err_up=None, err_dw=None, abserr=1, label=None, 
+          h=300, w=None, mode=["lines+markers"], 
+          data=None, data_err=None,
+          xlabel=None, ylabel=None, title=None, fontsize=12, showlegend=True):
 
     if data:
         x=[]; y=[]
@@ -161,6 +165,11 @@ def PPlot(data=None, x=None,y=None, data_err=None, err_up=None, err_dw=None, abs
     if (err_up is not None) & (err_dw is None):
         err_dw = err_up
 
+    if np.isscalar(mode):
+        mode = [mode]
+    if multlin & (len(mode)==1):
+        mode *= len(y)
+
     layout = go.Layout(autosize=True, width=w, height=h,  margin=dict(l=10, r=10, t=20, b=10))
     fig = go.Figure(layout=layout)
 
@@ -176,6 +185,18 @@ def PPlot(data=None, x=None,y=None, data_err=None, err_up=None, err_dw=None, abs
                          array=err_up[i], 
                          arrayminus=err_dw[i], 
                          visible=True)
-        fig.add_scatter(x=x[i],y=y[i],name=label[i],error_y=error_y, **kargs)
+        fig.add_scatter(x=x[i], y=y[i], name=label[i], error_y=error_y, mode=mode[i])#**kargs)
+
+        fig.update_layout(xaxis_title=xlabel,
+                          yaxis_title=ylabel,
+                          #legend_title="Legend Title",
+                          title=title,
+                          font=dict(
+                          #    family="Courier New, monospace",
+                              size=fontsize,
+                          #    color="RebeccaPurple"
+                          ),
+                          showlegend=showlegend 
+                         )
         
     fig.show()
