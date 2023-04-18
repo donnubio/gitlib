@@ -14,11 +14,26 @@ output_notebook()
 
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.offline as pyo
+#from plotly.offline import init_notebook_mode #to plot in jupyter notebook
+#init_notebook_mode() # init plotly in jupyter notebook
+
+import matplotlib.pyplot as plt
+
+##interactive matplotlib in jupyter:
+#%matplotlib widget
+##in case of GoogleCollab:
+#!pip install ipympl -q
+#from google.colab import output
+#output.enable_custom_widget_manager()
 
 import heartpy as hp
 from heartpy.datautils import rolling_mean
 
 import neurokit2 as nk
+
+import hrvanalysis as hrva
+#pip install hrv-analysis -q
 
 import sys
 
@@ -36,8 +51,8 @@ def LoadData(filename):
         y_ppg = m['y_ppg'][0]
         y_ppg_r = m['y_ppg_r'][0]
     if 'events' in m:
-        t_events = m['events'][:,0]
-        y_events = m['events'][:,1] #[:,1:]
+        t_events = m['events'][:,1]
+        y_events = m['events'][:,0] #[:,1:]
     if 't_ecg' in m:
         fs_ecg = m['fs_ecg'][0][0]
         t_ecg = m['t_ecg'][0]
@@ -92,6 +107,24 @@ def GetHeartRate(t, yf, fs=500, ppg_systolic_peaks=True, signal_type='ppg'):
   return(tP,P, tPP,PP, tHR,HR)
 
 
+def NNI_OtliersCorrection(tNN,NN, p=95, dbg=False):
+    dNN = np.abs(np.diff(NN))
+    thr = np.percentile(dNN, p)
+    io = np.where( dNN>thr )[0]
+    iodel = np.where( np.diff(io)>1 )[0] + 1
+    iodel = np.insert(iodel,0, 0)
+    io = np.delete(io,iodel)
+    if dbg:
+        PPlot([tNN,tNN[io]],[dNN,dNN[io]],mode=['lines+markers','markers'])
+        PPlot([tNN,tNN[io]],[NN,NN[io]],mode=['lines+markers','markers'])
+    NN2=NN.copy()
+    NN2[io]=np.nan
+    NN2 = hrva.interpolate_nan_values(NN2, interpolation_method='linear')
+    if dbg:
+        PPlot([tNN,tNN],[NN,NN2],mode=['lines','lines'])
+    return(NN2)
+
+
 def SignalCutSegment(t,y,t1,t2,time_from_zero=0):
   i = np.where( (t>t1) & (t<=t2) )
   segm_t=t[i]
@@ -99,6 +132,7 @@ def SignalCutSegment(t,y,t1,t2,time_from_zero=0):
   if time_from_zero:
       segm_t -= segm_t[0]
   return(segm_t, segm_y)     
+
 
 
 def SimpleFFT(t,y, t1=None,t2=None):
@@ -114,6 +148,40 @@ def SimpleFFT(t,y, t1=None,t2=None):
   Fr = scipy.fft.rfftfreq( len(y), 1 / fs)
   return(Fr,A)  
 
+def SpectrogramSTFT(y, sf, frband=None, segmleng=1000, plottype='plotly'):
+    #The spectrogram is a two-dimensional representation of the squared magnitude of the STFT:
+
+    freqs, bins, Zxx = signal.stft(y, sf, nperseg=segmleng)
+    Zxx=np.abs(Zxx)**2
+
+    if frband:
+        ifr = np.where( (freqs>frband[0]) & (freqs<frband[1])  )[0]
+        freqs = freqs[ifr]
+        Zxx = Zxx[ifr,:]
+
+    if plottype.casefold()=='plotly':
+        trace = [go.Heatmap(
+            x= bins,
+            y= freqs,
+            z= Zxx,#10*np.log10(Zxx),
+            colorscale='Jet',
+            )]
+        layout = go.Layout(
+            #title = 'Spectrogram with plotly',
+            yaxis = dict(title = 'Frequency [Hz]'), # x-axis label
+            xaxis = dict(title = 'Time [sec]'), # y-axis label
+            )
+        fig = go.Figure(data=trace, layout=layout)
+        pyo.iplot(fig, filename='Spectrogram')
+
+    if plottype.casefold()=='matplotlib':
+        #plt.pcolormesh(bins, freqs, np.abs(Zxx), vmin=0, vmax=amp, shading='gouraud')
+        plt.pcolormesh(bins, freqs, np.abs(Zxx), shading='gouraud')
+        #plt.title('STFT Magnitude')
+        plt.ylabel('Frequency [Hz]')
+        plt.xlabel('Time [sec]')
+        #plt.ylim(0.01, 0.3)
+        plt.show() 
 
 def interpRRI(x, y, new_sample_rate):
     xnew = np.arange(x[0], x[-1], 1/new_sample_rate)
