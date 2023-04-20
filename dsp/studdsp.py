@@ -1,4 +1,5 @@
 import dsp
+import dsp.hrrec as hrrec
 
 ####################################################################  
 
@@ -28,7 +29,7 @@ def ВирізатиФрагментСигналу(час, сигнал, час_
    return(segm_t, segm_y)
 
 def КорекціяВикідівNNI(час, сигналNNI, імовірність=95, будувати_графіки=False):
-   сигналNNI = dsp.NNI_OtliersCorrection(час,сигналNNI, p=імовірність, dbg=будувати_графіки)
+   сигналNNI = dsp.OtliersCorrectionNNI(час,сигналNNI, p=імовірність, dbg=будувати_графіки)
    return(сигналNNI)
 
 def ПеретворенняФурє(час, сигнал, час_початок_фрагменту=None, час_кінець_фрагменту=None):
@@ -38,10 +39,17 @@ def ПеретворенняФурє(час, сигнал, час_початок
 def Спектрограма(сигнал, частота_дискретизац, смуга_частот=None, довжина_сегмента=1000, plottype='plotly'):
    dsp.SpectrogramSTFT(y=сигнал, sf=частота_дискретизац, frband=смуга_частот, segmleng=довжина_сегмента, plottype='plotly')
 
-def інтерполяціяRRI(час_RRI, сигнал_RRI, нова_частота_дискретизації):
-   час_RRI_і, сигнал_RRI_і = dsp.interpRRI(час_RRI, сигнал_RRI, нова_частота_дискретизації)
-   return(час_RRI_і, сигнал_RRI_і)
+def ІнтерполяціяNNI(час_NNI, сигнал_NNI, нова_частота_дискретизації):
+   час_NNI_і, сигнал_NNI_і = dsp.InterpNNI(час_NNI, сигнал_NNI, нова_частота_дискретизації)
+   return(час_NNI_і, сигнал_NNI_і)
    
+def ЛогістичнаФункція(x, ymin, ymax, xmdl, tau):
+   return hrrec.LogisticFun(x, ymin, ymax, xmdl, tau)
+
+def ПрипасуватиЛогістичнуФункціюДоВідновленняЧСС(час, ЧСС, початок_фрагмента=None, кінець_фрагмента=None):
+   (params_fit, HR_fit, covr, tHR, HR) = hrrec.FitLogisticFun(tHR=час, HR=ЧСС, t1=початок_фрагмента, t2=кінець_фрагмента)
+   return(params_fit, HR_fit, covr, tHR, HR)
+
 ####################################################################  
 from dsp import BPlot
 from dsp import PPlot

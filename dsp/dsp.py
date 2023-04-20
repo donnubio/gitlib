@@ -62,21 +62,36 @@ def LoadData(filename):
 
 
 def Filtration(y, fs, fc, ord=2, ftype='lowpass'):
-  #y - синал, що має чатоту дискретизації fs (в Гц)
-  #fc - частота зрізу фільтра в Гц (corner freaquency)
-  #ord - порядок фільтру, ціле число
-  #ftype='lowpass' - Фільтр низьких частот (ФНЧ), пропускає низькі частоти, та послаблює частоти, розташовані вище частоти зрізу фільтру (fc). 
-  #                  Наприклад фільтр з fc=10 пропустить сигнали з частотами <10Гц
-  #ftype='highpass' - Фільтр верхніх частот (ФВЧ), пропускає високочастотні сигнали, але послаблює (зменшує амплітуду) сигналів з частотами нижче частоти зрізу. 
-  #                  Наприклад фільтр з fc=10 пропустить сигнали з частотами >10Гц 
-  #ftype='bandpass' - Смуговий фільтр, пропускає сигнали в певному діапазоні (смузі) частот, і послаблює (вирізає) сигнали частот за межами цієї смуги. 
-  #                  Наприклад, смуговий фільтр з fc=[10,20] пропускає тільки сигнали, частота яких лежить в інтервалі 10-20 Гц. 
-  if isinstance(fc, list): fc = np.array(fc)
-  fnq = fs / 2
-  fc_nrm = fc / fnq
-  b, a = signal.butter(ord, fc_nrm, btype=ftype)
-  yf = signal.filtfilt(b, a, y)
-  return yf  
+
+    """
+    Фільтрація сигналу
+
+    Parameters
+    ----------
+    y - синал, що має чатоту дискретизації fs (в Гц)
+    fc - частота зрізу фільтра в Гц (corner freaquency)
+    ord - порядок фільтру, ціле число
+    ftype='lowpass' - Фільтр низьких частот (ФНЧ), пропускає низькі частоти, та послаблює частоти, розташовані вище частоти зрізу фільтру (fc). 
+                     Наприклад фільтр з fc=10 пропустить сигнали з частотами <10Гц
+    ftype='highpass' - Фільтр верхніх частот (ФВЧ), пропускає високочастотні сигнали, але послаблює (зменшує амплітуду) сигналів з частотами нижче частоти зрізу. 
+                      Наприклад фільтр з fc=10 пропустить сигнали з частотами >10Гц 
+    ftype='bandpass' - Смуговий фільтр, пропускає сигнали в певному діапазоні (смузі) частот, і послаблює (вирізає) сигнали частот за межами цієї смуги. 
+                      Наприклад, смуговий фільтр з fc=[10,20] пропускає тільки сигнали, частота яких лежить в інтервалі 10-20 Гц. 
+
+    Results
+    ----------
+    yf
+
+    Examples
+    --------
+    """
+
+    if isinstance(fc, list): fc = np.array(fc)
+    fnq = fs / 2
+    fc_nrm = fc / fnq
+    b, a = signal.butter(ord, fc_nrm, btype=ftype)
+    yf = signal.filtfilt(b, a, y)
+    return yf  
 
 def GetHeartRate(t, yf, fs=500, ppg_systolic_peaks=True, signal_type='ppg'):
   # # завантажуємо сигнал фотоплетизмограми (ФПГ) в масиви t (час в сек), y ("об'єм крові в пальці", що міняється в часі)
@@ -107,7 +122,7 @@ def GetHeartRate(t, yf, fs=500, ppg_systolic_peaks=True, signal_type='ppg'):
   return(tP,P, tPP,PP, tHR,HR)
 
 
-def NNI_OtliersCorrection(tNN,NN, p=95, dbg=False):
+def OtliersCorrectionNNI(tNN,NN, p=95, dbg=False):
     dNN = np.abs(np.diff(NN))
     thr = np.percentile(dNN, p)
     io = np.where( dNN>thr )[0]
@@ -122,18 +137,22 @@ def NNI_OtliersCorrection(tNN,NN, p=95, dbg=False):
     NN2 = hrva.interpolate_nan_values(NN2, interpolation_method='linear')
     if dbg:
         PPlot([tNN,tNN],[NN,NN2],mode=['lines','lines'])
-    return(NN2)
+    return( np.array(NN2) )
 
-
-def SignalCutSegment(t,y,t1,t2,time_from_zero=0):
-  i = np.where( (t>t1) & (t<=t2) )
-  segm_t=t[i]
-  segm_y=y[i]
-  if time_from_zero:
-      segm_t -= segm_t[0]
-  return(segm_t, segm_y)     
-
-
+def SignalCutSegment(t,y,t1,t2=None,time_from_zero=0):
+    if (t1 is not None) and (t2 is None):
+        i = np.where( t>t1 )
+    elif (t1 is None) and (t2 is not None):
+        i = np.where( t<=t2 )
+    elif (t1 is not None) and (t2 is not None):
+        i = np.where( (t>t1) & (t<=t2) )
+    else:
+        i =  range(len(y))
+    segm_t=t[i]
+    segm_y=y[i]
+    if time_from_zero:
+        segm_t -= segm_t[0]
+    return(segm_t, segm_y)     
 
 def SimpleFFT(t,y, t1=None,t2=None):
   fs = 1/np.mean(np.diff(t))
@@ -183,7 +202,7 @@ def SpectrogramSTFT(y, sf, frband=None, segmleng=1000, plottype='plotly'):
         #plt.ylim(0.01, 0.3)
         plt.show() 
 
-def interpRRI(x, y, new_sample_rate):
+def InterpNNI(x, y, new_sample_rate):
     xnew = np.arange(x[0], x[-1], 1/new_sample_rate)
     ynew = np.interp(xnew, x, y)
     return(xnew, ynew)
