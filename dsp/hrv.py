@@ -6,7 +6,7 @@ import os
 #import plotly.graph_objects as go
 
 
-def get_hrvprms(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60, fd_stft_win_shift=5):
+def GetHRVIndices(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60, fd_stft_win_shift=5):
 
     file_path = os.path.dirname(os.path.realpath(__file__))
     ro.r['source'](file_path + '/hrv.R')
@@ -20,9 +20,4 @@ def get_hrvprms(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60, fd_stf
             hrvp[n]=hrvp[n][0]
 
     return(hrvp)
-
-
-    return(D,A, ba_pr, ba_pr_L, ba_pr_R)
-
-
  

@@ -1,5 +1,7 @@
 import dsp
 import dsp.hrrec as hrrec
+import dsp.hrv as hrv
+
 
 ####################################################################  
 
@@ -53,3 +55,8 @@ def ПрипасуватиЛогістичнуФункціюДоВідновле
 ####################################################################  
 from dsp import BPlot
 from dsp import PPlot
+
+def ОбчислитиПараметриВСР(сигнал_NNI, нова_частота_дискретизації=4, td_win_size=60, fd_stft_win_size=60, fd_stft_win_shift=5):
+   hrvind = hrv.GetHRVIndices(сигнал_NNI, fd_interp_rri=нова_частота_дискретизації, td_win_size=60, fd_stft_win_size=60, fd_stft_win_shift=5)
+   return(hrvind)
+
