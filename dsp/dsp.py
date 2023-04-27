@@ -50,6 +50,9 @@ def LoadData(filename):
         t_ppg = m['t_ppg'][0]
         y_ppg = m['y_ppg'][0]
         y_ppg_r = m['y_ppg_r'][0]
+        if 'events_ppg' in m:
+            t_events = m['events_ppg'][:,1]
+            y_events = m['events_ppg'][:,0] #[:,1:]
     if 'events' in m:
         t_events = m['events'][:,1]
         y_events = m['events'][:,0] #[:,1:]
@@ -57,6 +60,9 @@ def LoadData(filename):
         fs_ecg = m['fs_ecg'][0][0]
         t_ecg = m['t_ecg'][0]
         y_ecg = m['y_ecg'][0]
+        if 'events_ecg' in m:
+            t_events = m['events_ecg'][:,1]
+            y_events = m['events_ecg'][:,0] #[:,1:]        
     
     return(t_ppg, y_ppg, y_ppg_r, fs_ppg, t_ecg, y_ecg, fs_ecg, t_events, y_events)
 
