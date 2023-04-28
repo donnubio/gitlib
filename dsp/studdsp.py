@@ -6,8 +6,8 @@ import dsp.hrv as hrv
 ####################################################################  
 
 def ЗавантажитиДані( ІмяФайлу ):
-   (t_ppg, y_ppg, y_ppg_r, fs_ppg, t_ecg, y_ecg, fs_ecg, t_events, y_events) = dsp.LoadData(ІмяФайлу)
-   return(t_ppg, y_ppg, y_ppg_r, fs_ppg, t_ecg, y_ecg, fs_ecg, t_events, y_events)
+   (t_ppg, y_ppg, y_ppg_r, fs_ppg, t_ecg, y_ecg, fs_ecg, t_bp, y_bp, fs_bp, t_events, y_events) = dsp.LoadData(ІмяФайлу)
+   return(t_ppg, y_ppg, y_ppg_r, fs_ppg, t_ecg, y_ecg, fs_ecg, t_bp, y_bp, fs_bp, t_events, y_events)
 
 def ФільтраціяСигналу(сигнал, частота_дискретизац, частота_зрізу, порядок_фільтра=2, тип_фільтра='lowpass'):
    відфільтрований_сигнал = dsp.Filtration(сигнал, частота_дискретизац, частота_зрізу, ord=порядок_фільтра, ftype=тип_фільтра)

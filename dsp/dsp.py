@@ -44,6 +44,7 @@ def LoadData(filename):
     t_events = None; y_events = None
     fs_ppg = None; t_ppg = None; y_ppg = None; y_ppg_r = None
     fs_ecg = None; t_ecg = None; y_ecg = None
+    fs_bp = None; t_bp = None; y_bp = None
 
     if 't_ppg' in m:
         fs_ppg = m['fs_ppg'][0][0]
@@ -63,8 +64,15 @@ def LoadData(filename):
         if 'events_ecg' in m:
             t_events = m['events_ecg'][:,1]
             y_events = m['events_ecg'][:,0] #[:,1:]        
-    
-    return(t_ppg, y_ppg, y_ppg_r, fs_ppg, t_ecg, y_ecg, fs_ecg, t_events, y_events)
+    if 't_bp' in m:
+        fs_bp = m['fs_bp'][0][0]
+        t_bp = m['t_bp'][0]
+        y_bp = m['y_bp'][0]
+        if 'events_bp' in m:
+            t_events = m['events_bp'][:,1]
+            y_events = m['events_bp'][:,0] #[:,1:]  
+
+    return(t_ppg, y_ppg, y_ppg_r, fs_ppg, t_ecg, y_ecg, fs_ecg, t_bp, y_bp, fs_bp, t_events, y_events)
 
 
 def Filtration(y, fs, fc, ord=2, ftype='lowpass'):
