@@ -6,13 +6,13 @@ import os
 #import plotly.graph_objects as go
 
 
-def GetHRVIndices(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60, fd_stft_win_shift=5):
+def GetHRVIndices(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60, fd_stft_win_shift=5, fd_stft_mean=True):
 
     file_path = os.path.dirname(os.path.realpath(__file__))
     ro.r['source'](file_path + '/hrv.R')
     fun_get_hrvprms_r = ro.globalenv['get_hrvprms'] #rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60, fd_stft_win_shift=5
     rr_r = FloatVector( rr )
-    hrv_r = fun_get_hrvprms_r(rr_r, fd_interp_rri, td_win_size, fd_stft_win_size, fd_stft_win_shift)
+    hrv_r = fun_get_hrvprms_r(rr_r, fd_interp_rri, td_win_size, fd_stft_win_size, fd_stft_win_shift, fd_stft_mean)
 
     hrvp = { key : np.array( hrv_r.rx(key)[0] ) for key in hrv_r.names }
     for n in hrvp.keys():

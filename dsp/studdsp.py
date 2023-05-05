@@ -56,7 +56,7 @@ def ПрипасуватиЛогістичнуФункціюДоВідновле
 from dsp import BPlot
 from dsp import PPlot
 
-def ОбчислитиПараметриВСР(сигнал_NNI, нова_частота_дискретизації=4, td_win_size=60, fd_stft_win_size=60, fd_stft_win_shift=5):
-   hrvind = hrv.GetHRVIndices(сигнал_NNI, fd_interp_rri=нова_частота_дискретизації, td_win_size=60, fd_stft_win_size=60, fd_stft_win_shift=5)
+def ОбчислитиПараметриВСР(сигнал_NNI, нова_частота_дискретизації=4, td_win_size=60, fd_stft_win_size=60, fd_stft_win_shift=5, fd_stft_mean=True):
+   hrvind = hrv.GetHRVIndices(сигнал_NNI, fd_interp_rri=нова_частота_дискретизації, td_win_size=td_win_size, fd_stft_win_size=fd_stft_win_size, fd_stft_win_shift=fd_stft_win_shift, fd_stft_mean=fd_stft_mean)
    return(hrvind)
 

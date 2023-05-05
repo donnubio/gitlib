@@ -3,7 +3,7 @@ library(pacman)
 #p_load(rmatio, gdata, boot, ggplot2, RHRV, clipr, Metrics, tictoc, nortest, quantreg)
 p_load(RHRV)
 
-get_hrvprms <- function(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60, fd_stft_win_shift=5)
+get_hrvprms <- function(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60, fd_stft_win_shift=5, fd_stft_mean = T)
 {
     ######################
     #Frequency Analysis
@@ -96,14 +96,25 @@ get_hrvprms <- function(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60
     
 
     #########RES2###############
-    TF_ST <- mean(TF)
-    ULF_ST <- mean(ULF)
-    VLF_ST <- mean(VLF)
-    LF_ST <- mean(LF)
-    HF_ST <- mean(HF)
-    LFHF_ST <- mean(LFHF)
-    HFn_ST <- mean(HFn) 
-    LFn_ST <- mean(LFn)   
+    if(fd_stft_mean){
+      TF_ST <- mean(TF)
+      ULF_ST <- mean(ULF)
+      VLF_ST <- mean(VLF)
+      LF_ST <- mean(LF)
+      HF_ST <- mean(HF)
+      LFHF_ST <- mean(LFHF)
+      HFn_ST <- mean(HFn) 
+      LFn_ST <- mean(LFn)   
+    }else{
+      TF_ST <- TF
+      ULF_ST <- ULF
+      VLF_ST <- VLF
+      LF_ST <- LF
+      HF_ST <- HF
+      LFHF_ST <- LFHF
+      HFn_ST <- HFn 
+      LFn_ST <- LFn   
+    }
     ########################### 
 
     #########RES3###############

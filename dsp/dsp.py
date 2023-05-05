@@ -168,7 +168,7 @@ def SignalCutSegment(t,y,t1,t2=None,time_from_zero=0):
         segm_t -= segm_t[0]
     return(segm_t, segm_y)     
 
-def SimpleFFT(t,y, t1=None,t2=None):
+def SimpleFFT(t,y, t1=None,t2=None, degree=False):
   fs = 1/np.mean(np.diff(t))
   if not t1:
     t1=t[0]
@@ -177,9 +177,10 @@ def SimpleFFT(t,y, t1=None,t2=None):
   y = y[(t>=t1)&(t<=t2)]
   t = t[(t>=t1)&(t<=t2)]
   A = scipy.fft.rfft(y, norm='forward')
+  Ph = np.angle(A, deg = degree)
   A = np.abs( A ) * 2
   Fr = scipy.fft.rfftfreq( len(y), 1 / fs)
-  return(Fr,A)  
+  return(Fr,A,Ph)  
 
 def SpectrogramSTFT(y, sf, frband=None, segmleng=1000, plottype='plotly'):
     #The spectrogram is a two-dimensional representation of the squared magnitude of the STFT:
