@@ -3,21 +3,41 @@ library(pacman)
 #p_load(rmatio, gdata, boot, ggplot2, RHRV, clipr, Metrics, tictoc, nortest, quantreg)
 p_load(RHRV)
 
-get_hrvprms <- function(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60, fd_stft_win_shift=5, fd_stft_mean = T)
+get_hrvprms <- function(rr, 
+                        fd_interp_rri=4, 
+                        td_win_size=60, 
+                        fd_stft_win_size=60, 
+                        fd_stft_win_shift=5,
+                        fd_stft_win_extend=NULL, 
+                        fd_time_mean = T,
+                        ULF_L = 0, ULF_R = 0.03, #0.03 in RHRV
+                        VLF_L = 0.03, VLF_R = 0.05,
+                        LF_L = 0.05, LF_R = 0.15,
+                        HF_L = 0.15, HF_R = 0.4,
+                        wavelet = "d4",
+                        bandtolerance = 0.01)
 {
+
     ######################
     #Frequency Analysis
     ######################
     FR_INTERP_RRI <- fd_interp_rri #4 #Hz 
-    ULF_L <- 0;    ULF_R <- 0.04
-    VLF_L <- 0;    VLF_R <- 0.04
-    LF_L <- 0.04;  LF_R <- 0.15 
-    HF_L <- 0.15;  HF_R <- 0.4
+    # ULF_L <- 0;    ULF_R <- 0.04
+    # VLF_L <- 0;    VLF_R <- 0.04
+    # LF_L <- 0.04;  LF_R <- 0.15 
+    # HF_L <- 0.15;  HF_R <- 0.4
     ######################
     #STFT
     ######################
     STFT_WIN_SEC <- fd_stft_win_size #default 5min
     STFT_WIN_SHIFT_SEC <- fd_stft_win_shift #default 30
+    if(is.null(fd_stft_win_extend)){
+      STFT_SIZESP = NULL
+    }else{
+      STFT_SIZESP = (fd_stft_win_size+fd_stft_win_extend) * FR_INTERP_RRI
+      STFT_SIZESP = 2 ^ ceiling(log2( STFT_SIZESP )) # STFT_SIZESP = 2^n
+    }
+
     ######################
     #periodogram using a FFT
     ######################
@@ -32,7 +52,7 @@ get_hrvprms <- function(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60
     hd$Beat = hd$Beat[-1,]
 
 
-    #########################################
+    ################################1000 ##########
     ####Time Analysis
     #########################################
     hd = CreateTimeAnalysis(hd,size=td_win_size,interval = 7.8125)
@@ -49,7 +69,7 @@ get_hrvprms <- function(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60
     ####Short-Time Fourier Transform (STFT)
     ###################################################
     hd = CreateFreqAnalysis(hd)
-    hd = CalculatePowerBand(hd, indexFreqAnalysis= 1, size = STFT_WIN_SEC, shift = STFT_WIN_SHIFT_SEC,
+    hd = CalculatePowerBand(hd, indexFreqAnalysis= 1, size = STFT_WIN_SEC, shift = STFT_WIN_SHIFT_SEC, sizesp=STFT_SIZESP,
                             ULFmin = ULF_L, ULFmax = ULF_R, VLFmin = VLF_L, VLFmax = VLF_R,
                             LFmin = LF_L, LFmax = LF_R, HFmin = HF_L, HFmax = HF_R)
     TF <- hd$FreqAnalysis[1][[1]]$HRV
@@ -60,6 +80,7 @@ get_hrvprms <- function(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60
     LFHF <- hd$FreqAnalysis[1][[1]]$LFHF
     HFn <- HF/(LF+HF)*100 #HFn <- HF/(TF-VLF)*100
     LFn <- LF/(LF+HF)*100 #LFn <- LF/(TF-VLF)*100
+    T_ST <- hd$FreqAnalysis[1][[1]]$Time
 
     ###################################################
     ####Frequency Analysis of Stationary Signals
@@ -88,15 +109,33 @@ get_hrvprms <- function(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60
     hd2$Beat = hd2$Beat[-1,]
 
     hd2 = CreateFreqAnalysis(hd2)
-    hd2=CalculatePSD(hd2,indexFreqAnalysis=3,method="lomb", doPlot = F)
+    hd2=CalculatePSD(hd2, indexFreqAnalysis=3, method="lomb", doPlot = F)
     E_LB <- CalculateEnergyInPSDBands(hd2, indexFreqAnalysis=3,
                     ULFmin = ULF_L, ULFmax = HF_R, VLFmin = VLF_L, VLFmax = VLF_R,
                     LFmin = LF_L, LFmax = LF_R, HFmin = HF_L, HFmax = HF_R)
 
     
+    ###################################################
+    ####Frequency Analysis of Nonstationary Signals
+    ####Short-Time Fourier Transform (STFT)
+    ###################################################
+    hd = CreateFreqAnalysis(hd)
+    hd = CalculatePowerBand(hd, indexFreqAnalysis=3, type="wavelet", wavelet=wavelet, bandtolerance = bandtolerance,
+                            ULFmin = ULF_L, ULFmax = ULF_R, VLFmin = VLF_L, VLFmax = VLF_R,
+                            LFmin = LF_L, LFmax = LF_R, HFmin = HF_L, HFmax = HF_R)
+
+    TF_WL <- hd$FreqAnalysis[3][[1]]$HRV
+    ULF_WL <- hd$FreqAnalysis[3][[1]]$ULF
+    VLF_WL <- hd$FreqAnalysis[3][[1]]$VLF
+    LF_WL <- hd$FreqAnalysis[3][[1]]$LF
+    HF_WL <- hd$FreqAnalysis[3][[1]]$HF
+    LFHF_WL <- hd$FreqAnalysis[3][[1]]$LFHF
+    HFn_WL <- HF/(LF+HF)*100 #HFn <- HF/(TF-VLF)*100
+    LFn_WL <- LF/(LF+HF)*100 #LFn <- LF/(TF-VLF)*100
+    T_WL <- hd$FreqAnalysis[3][[1]]$Time
 
     #########RES2###############
-    if(fd_stft_mean){
+    if(fd_time_mean){
       TF_ST <- mean(TF)
       ULF_ST <- mean(ULF)
       VLF_ST <- mean(VLF)
@@ -137,6 +176,28 @@ get_hrvprms <- function(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60
     LFHF_LB <- LF_LB/HF_LB
     ###########################
 
+    #########RES5###############
+    if(fd_time_mean){
+      TF_WL <- mean(TF_WL)
+      ULF_WL <- mean(ULF_WL)
+      VLF_WL <- mean(VLF_WL)
+      LF_WL <- mean(LF_WL)
+      HF_WL <- mean(HF_WL)
+      LFHF_WL <- mean(LFHF_WL)
+      HFn_WL <- mean(HFn_WL) 
+      LFn_WL <- mean(LFn_WL)   
+    }else{
+      TF_WL <- TF_WL
+      ULF_WL <- ULF_WL
+      VLF_WL <- VLF_WL
+      LF_WL <- LF_WL
+      HF_WL <- HF_WL
+      LFHF_WL <- LFHF_WL
+      HFn_WL <- HFn_WL 
+      LFn_WL <- LFn_WL   
+    }
+    ########################### 
+
     r <- list( 
       SDNN=hd$TimeAnalysis[[1]]$SDNN, #1
       SDANN=hd$TimeAnalysis[[1]]$SDANN, #2
@@ -160,6 +221,7 @@ get_hrvprms <- function(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60
       LFn_ST=LFn_ST, #19
       HFn_ST=HFn_ST, #20
       LFHF_ST=LFHF_ST, #21
+      T_ST=T_ST,
       #####################################
       ULF_PG=ULF_PG, #22
       VLF_PG=VLF_PG, #23
@@ -176,6 +238,16 @@ get_hrvprms <- function(rr, fd_interp_rri=4, td_win_size=60, fd_stft_win_size=60
       LFn_LB=LFn_LB, #33
       HFn_LB=HFn_LB, #34
       LFHF_LB=LFHF_LB, #35
+      #####################################
+      TF_WL=TF_WL, #
+      ULF_WL=ULF_WL, #
+      VLF_WL=VLF_WL, #
+      LF_WL=LF_WL, #
+      HF_WL=HF_WL, #
+      LFn_WL=LFn_WL, #
+      HFn_WL=HFn_WL, #
+      LFHF_WL=LFHF_WL, #  
+      T_WL=T_WL, #    
       #####################################
       #PSD_ST_FR=hd$FreqAnalysis[[1]]$periodogram$freq, 
       #PSD_ST_PW=hd$FreqAnalysis[[1]]$periodogram$spec,
@@ -377,3 +449,85 @@ NMS_HRVPRMS2 <- c("SDNN (ms)","SDANN (ms)","SDNNIDX (ms)","pNN50 (%)","SDSD (ms)
 #######################################################################################################
 #######################################################################################################
 #######################################################################################################
+
+cmatrfun <- function(M,c,f){
+    for(j in seq(1,ncol(M)))
+        M[,j] <- f(M[,j],c)
+    return(M)
+}
+rmatrfun <- function(M,r,f){
+    for(i in seq(1,nrow(M)))
+        M[i,] <- f(M[i,],r)
+    return(M)
+}
+
+
+SlidingHRV <- function( t_NN, NN, 
+                        win_segm, win_ovlp,  
+                        fd_interp_rri=4, 
+                        td_win_size=60, 
+                        fd_stft_win_size=60, 
+                        fd_stft_win_shift=5,
+                        ULF_L = 0, ULF_R = 0.03, #0.03 in RHRV
+                        VLF_L = 0.03, VLF_R = 0.05,
+                        LF_L = 0.05, LF_R = 0.15,
+                        HF_L = 0.15, HF_R = 0.4,
+                        wavelet = "d4",
+                        bandtolerance = 0.01                        
+                        ){
+    
+    #d - from mat file, IRR time series
+    #win_segm (sec) - ковзаюче вікно, зміщується вздовж ряду IRR, на win_ovlp (sec)
+    #для кожн сегменту win_segm обчислюються показники ВСР
+    #fd_interp_rri, td_win_size, fd_stft_win_size, fd_stft_win_shift - params to "get_hrvprms" function
+
+    dt <- mean( diff( t_NN ) )
+    k_segm <- round(win_segm / dt) + 1
+    k_ovlp <- round(win_ovlp / dt) + 1
+    k_NN <- length( t_NN )
+
+    istmax_last_segm <- k_NN - k_segm + 1
+
+    hrv <- c()
+    ISTART <- seq( 1, istmax_last_segm, k_ovlp)
+    
+    for( ist in ISTART ){
+        iend <- ist + k_segm - 1
+        NN_segm <- NN[ ist:iend ]
+        hrv_ <- get_hrvprms(  NN_segm, 
+                              fd_interp_rri, td_win_size, fd_stft_win_size, fd_stft_win_shift, fd_time_mean = T,
+                              ULF_L, ULF_R , 
+                              VLF_L, VLF_R,
+                              LF_L, LF_R,
+                              HF_L, HF_R,
+                              wavelet = "d4",
+                              bandtolerance = 0.01 )
+        hrv <- rbind(hrv, hrv_)
+    }
+    colnames(hrv) <- names(hrv_)
+    rownames(hrv) <- seq(1,nrow(hrv))
+
+    r <- list( HRV=hrv, segm_num=length(ISTART), segm_start_time=t_NN[ISTART] )
+    return(r)
+}
+
+
+# hd = CreateHRVData()
+# hd = SetVerbose(hd,FALSE)
+# hd$Beat = data.frame( Time=cumsum( c(0,rr) )*1e-3 )
+# hd = BuildNIHR(hd)
+# hd$Beat = hd$Beat[-1,]
+# hd = CreateFreqAnalysis(hd)
+# hd = InterpolateNIHR (hd, freqhr = 4)
+# hd = CalculatePowerBand(hd, indexFreqAnalysis= 1, type="wavelet", wavelet="la8", ULFmin = ULF_L, ULFmax = ULF_R, VLFmin = VLF_L, VLFmax = VLF_R, LFmin = LF_L, LFmax = LF_R, HFmin = HF_L, HFmax = HF_R)
+
+# hd = CreateHRVData()
+# hd = SetVerbose(hd,FALSE)
+# hd$Beat = data.frame( Time=cumsum( c(0,rr) )*1e-3 )
+# hd = BuildNIHR(hd)
+# hd$Beat = hd$Beat[-1,]
+# hd = InterpolateNIHR (hd, freqhr = 4)
+# hd = CreateFreqAnalysis(hd)
+# hd = CalculatePowerBand(hd, indexFreqAnalysis= 1)
+
+                     

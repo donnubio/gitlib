@@ -6,6 +6,9 @@ from scipy import signal
 from scipy.optimize import curve_fit
 from scipy.interpolate import splrep, BSpline, splev, spalde, sproot
 
+import librosa
+import librosa.display
+
 import bokeh.plotting as bh
 from bokeh.io import output_notebook, save
 from bokeh.palettes import Dark2_5 as palette
@@ -182,79 +185,253 @@ def SimpleFFT(t,y, t1=None,t2=None, degree=False):
   Fr = scipy.fft.rfftfreq( len(y), 1 / fs)
   return(Fr,A,Ph)  
 
-def SpectrogramSTFT(y, sf, frband=None, segmleng=1000, plottype='plotly'):
-    #The spectrogram is a two-dimensional representation of the squared magnitude of the STFT:
+def SpectrogramSTFT(y, sf, frband=None, 
+                    winsize_sec=60, shiftsize_sec=5, winextend_sec=0,
+                    scaling='spectrum', db=False, squaredmag=True,
+                    colorscale='Jet', w=None, h=None,
+                    plottype='plotly', stftlib='scipy'):
+    '''
+    The spectrogram is a two-dimensional representation of the squared magnitude of the STFT:
+    scaling: {‘spectrum’, ‘psd’}
+    stftlib:'scipy',librosa
+    plottype='plotly''matplotlib'
+    '''
+    winsize_smp = int( winsize_sec * sf )
+    shiftsize_smp = int( shiftsize_sec * sf )
+    winextend_smp = int( winextend_sec * sf )
+    noverlap = winsize_smp - shiftsize_smp
 
-    freqs, bins, Zxx = signal.stft(y, sf, nperseg=segmleng)
-    Zxx=np.abs(Zxx)**2
+    if stftlib.casefold()=='scipy':
+        fr, t, Zxx = signal.stft(y, sf, nperseg=winsize_smp, noverlap=noverlap, scaling=scaling)
+        t = t + winsize_sec/2
+    elif stftlib.casefold()=='librosa': 
+        Zxx = librosa.stft(y, n_fft = winsize_smp+winextend_smp, hop_length=shiftsize_smp, win_length=winsize_smp)
+        t = librosa.frames_to_time( np.arange(Zxx.shape[1])*1 , sr=sf, n_fft=winsize_smp, hop_length=shiftsize_smp)
+        fr = librosa.fft_frequencies(sr=sf, n_fft = winsize_smp+winextend_smp)
 
-    if frband:
-        ifr = np.where( (freqs>frband[0]) & (freqs<frband[1])  )[0]
-        freqs = freqs[ifr]
-        Zxx = Zxx[ifr,:]
+
+    if not (frband is None):
+        ifr = np.where( (fr>frband[0]) & (fr<frband[1])  )[0]
+        fr = fr[ifr]
+        Z = Zxx[ifr,:]
+
+    Z = np.abs(Z)
+    if squaredmag:
+        Z = Z**2 #квадрат від модуля амплітуд це потужність
+    if db:
+        Z = 20 * np.log10(Z / np.max(Z))
+        #Z = 10 * np.log10(Z)
+        #librosa.amplitude_to_db( np.abs(Z) )
+
+    if plottype is None:
+        plottype=''
 
     if plottype.casefold()=='plotly':
         trace = [go.Heatmap(
-            x= bins,
-            y= freqs,
-            z= Zxx,#10*np.log10(Zxx),
-            colorscale='Jet',
+            x= t,
+            y= fr,
+            z= Z,
+            colorscale=colorscale,
             )]
         layout = go.Layout(
             #title = 'Spectrogram with plotly',
             yaxis = dict(title = 'Frequency [Hz]'), # x-axis label
             xaxis = dict(title = 'Time [sec]'), # y-axis label
+            width=w, height=h, margin=dict(l=10, r=10, t=20, b=10),
             )
         fig = go.Figure(data=trace, layout=layout)
         pyo.iplot(fig, filename='Spectrogram')
 
+    if w is None: w=640
+    if h is None: h=480
+
     if plottype.casefold()=='matplotlib':
-        #plt.pcolormesh(bins, freqs, np.abs(Zxx), vmin=0, vmax=amp, shading='gouraud')
-        plt.pcolormesh(bins, freqs, np.abs(Zxx), shading='gouraud')
+        #plt.pcolormesh(bins, fr, np.abs(Z), vmin=0, vmax=amp, shading='gouraud')
+        plt.pcolormesh(t, fr, np.abs(Z), shading='gouraud')
         #plt.title('STFT Magnitude')
         plt.ylabel('Frequency [Hz]')
         plt.xlabel('Time [sec]')
         #plt.ylim(0.01, 0.3)
         plt.show() 
 
+    if plottype.casefold()=='librosa': 
+        #px = 1/plt.rcParams['figure.dpi']
+        plt.figure(figsize=(w/100, h/100))#figsize=(14, 3))
+        librosa.display.specshow(Z, sr=sf, x_axis='s', y_axis='hz')
+        plt.colorbar()
+        plt.show()        
+    
+    return fr,t,Z,Zxx
+
 def InterpNNI(x, y, new_sample_rate):
     xnew = np.arange(x[0], x[-1], 1/new_sample_rate)
     ynew = np.interp(xnew, x, y)
     return(xnew, ynew)
 
+
+def SignalScaling(y, scaltype='std'):
+    '''
+    signal normalization
+    'max' 'std' 'max_dcsave' 'std_dcsave'
+    '''
+    if scaltype.casefold() == 'max':
+        ys = y-np.mean(y)
+        ys = ys / np.max(np.abs(ys))
+    if scaltype.casefold() == 'std':
+        ys = y - np.mean(y)
+        ys = ys / np.std(ys)
+    if scaltype.casefold() == 'max_dcsave':
+        ys = y / np.max(np.abs(y))
+    if scaltype.casefold() == 'std_dcsave':
+        ys=y / np.std(ys)
+    
+    return(ys)
+
+
+def SlidinWindowFun(fun, x=None, y=None, y_sf=None, winsize_sec=60, winsize_hz=None, shiftsize_sec=5):
+
+    '''
+    y: single array or tuple of arrays
+    '''
+
+    if isinstance(y, tuple):
+        y = np.stack( y , axis=1)
+
+    if (y_sf is None) & (x is not None):
+        y_sf = np.mean( np.diff(x) )
+
+    if winsize_hz is not None:
+        winsize_sec = 1/winsize_hz
+    
+    winsize_smp = int( winsize_sec * y_sf )
+    shiftsize_smp = int( shiftsize_sec * y_sf )
+    N = y.shape[0]
+
+    if x is None:
+        r = [fun(y[i:i+winsize_smp,]) for i in range(0,N- winsize_smp + 1, shiftsize_smp)]
+    else:
+        r = [fun(x[i:i+winsize_smp],y[i:i+winsize_smp,]) for i in range(0,N- winsize_smp + 1, shiftsize_smp)]
+    
+    twin = ( np.arange(0,N- winsize_smp + 1, shiftsize_smp) + winsize_smp/2 ) / y_sf
+
+    return(r, twin)
+
+
+def FindNearestPoints(x_ref, y_ref, x, y=None, y0=0):
+    """
+    (x_nearest, y_nearest, i_nearest) = FindNearestPoints(x_ref, y_ref, x, y=None, y0=0)
+    For all x, find nearest values in x_ref. Their indices will be returned in i_nearest.
+    1) If y=None. The resulting vector x_nearest will have length equal to len of x.
+    2) If y is defined then x_nearest = x_ref.
+       Values of y will be copied to appropriate cells of resulting vctor y_nearest,
+       the remaining cells will be filled with the value of y0.
+    """
+
+    #isinstance(y,(list,np.ndarray))
+    if not isinstance(x, (list, np.ndarray)):
+        x=[x]
+    
+    if isinstance(x_ref, list): x_ref = np.array(x_ref)
+    if isinstance(y_ref, list): y_ref = np.array(y_ref)
+    if isinstance(x, list): x = np.array(x)
+    if isinstance(y, list): y = np.array(y)
+
+    i_nearest = [np.argmin(np.abs(np.array(x_ref)-val)) for val in x]
+    
+    if not (y is None):
+        x_nearest = x_ref
+        y_nearest = x_ref.copy()
+        y_nearest[:] = y0
+        y_nearest[i_nearest] = y
+    else:
+        y_nearest = y_ref[i_nearest]
+        x_nearest = x_ref[i_nearest]
+
+    return(x_nearest, y_nearest, i_nearest)
+    
+
+
 ####################################################################  
 
-def BPlot(x,y,label=None,h=150,w=1000,marker=None,**kargs):
-  multlin=0
-  if ( type(y[0]) is np.ndarray) | ( type(y[0]) is list):
-      multlin=1
-      
-  if multlin & (not label):
-      label = [str(l) for l in np.arange(1,len(y)+1)]
-  colors = itertools.cycle(palette)
-  fig=bh.figure(height=h, tools=['box_zoom','hover','reset','undo','redo','pan','save','crosshair'],sizing_mode="scale_width")
-  fig.toolbar.active_drag = None
-  if multlin:
-      for i in np.arange(len(y)):
-          col = next(colors)
-          fig.line(x[i],y[i], legend_label=label[i], color=col, **kargs)
-          if marker:
-              fig.circle(x[i],y[i], color=col, legend_label=label[i])
-          fig.legend.click_policy = "hide" #"mute"
-  else:
-      fig.line(x,y, **kargs)
-      if marker:
-          fig.circle(x,y)
-          
-  bh.show(fig)
+def BPlot(x=None,y=None,
+          h=150,w=1000,
+          mode=["lines"],
+          label=None, xlabel=None, ylabel=None, title=None, fontsize=12, showlegend=True,
+          marker=None,
+          xlim=[None,None], ylim=[None,None],
+          sizing_mode="scale_width", legend_location=None, y_axis_type="auto",
+          **kargs):
+    
+    '''
+        legend_location: 'right', "top_left" ...
+    '''
+  
+    multlin=0
+    if ( type(y[0]) is np.ndarray) | ( type(y[0]) is list):
+        multlin=1
+   
+    if multlin & (not label):
+        label = [str(l) for l in np.arange(1,len(y)+1)]
+    elif not multlin:
+        label = ['']
+        x=[x]
+        y=[y]
+    
+    if multlin & (x is None):
+        x = [x] * len(y)
+
+    for k in range(len(y)):
+            if x[k] is None:
+                x[k] = np.arange(len(y[k]))*1    
+
+    if np.isscalar(mode):
+        mode = [mode]
+    if multlin & (len(mode)==1):
+        mode *= len(y)  
+
+    colors = itertools.cycle(palette)
+    fig=bh.figure(height=h, width=w, tools=['box_zoom','hover','reset','undo','redo','pan','save','crosshair'],
+                  sizing_mode=sizing_mode,
+                  title=title,x_axis_label=xlabel,y_axis_label=ylabel,y_axis_type=y_axis_type)
+                  #title_text_font_size=str(fontsize)+'pt')
+    fig.toolbar.active_drag = None
+
+    for i in np.arange(len(y)):
+        mode_i = mode[i]
+        mode_i = mode_i.split('+')
+        col = next(colors)
+        if 'lines' in mode_i:
+            fig.line(x[i],y[i], legend_label=label[i], color=col, **kargs)
+        if 'markers' in mode_i:
+            fig.circle(x[i],y[i], color=col, legend_label=label[i])
+        fig.legend.click_policy = "hide" #"mute"
+    
+    if title:
+        fig.title.text_font_size = str(fontsize)+'pt'
+    if label:
+        fig.legend.title_text_font_size = str(fontsize)+'pt'
+    fig.legend.label_text_font_size = str(fontsize)+'pt'
+    fig.xaxis.axis_label_text_font_size = str(fontsize)+'pt'
+    fig.yaxis.axis_label_text_font_size = str(fontsize)+'pt'
+    fig.xaxis.major_label_text_font_size  = str(fontsize)+'pt'
+    fig.yaxis.major_label_text_font_size  = str(fontsize)+'pt'
+
+    if legend_location:
+        fig.legend.location = legend_location
+
+    if (not multlin) | (not showlegend):
+        fig.legend.visible=False
+            
+    bh.show(fig)
 
 ################################################################################
 
 def PPlot(x=None, y=None, 
           err_up=None, err_dw=None, abserr=1, label=None, 
-          h=300, w=None, mode=["lines+markers"], 
+          h=300, w=None, mode=["lines"], 
           data=None, data_err=None,
-          xlabel=None, ylabel=None, title=None, fontsize=12, showlegend=True):
+          xlabel=None, ylabel=None, title=None, fontsize=12, showlegend=True,
+          xlim=[None,None], ylim=[None,None]):
 
     if data:
         x=[]; y=[]
@@ -318,3 +495,104 @@ def PPlot(x=None, y=None,
                          )
         
     fig.show()
+
+################################################################################
+
+def MPlot(x=None, y=None, 
+          err_up=None, err_dw=None, abserr=1, label=None, 
+          h=480, w=640, mode=["lines"], 
+          xlim=[None,None], ylim=[None,None],
+          data=None, data_err=None,
+          xlabel=None, ylabel=None, title=None, fontsize=12, showlegend=True, 
+          showfigure=True):
+
+    if data:
+        x=[]; y=[]
+        for k in range(len(data)):
+            x.append(data[k][0])
+            y.append(data[k][1])
+    if data_err:
+        err_up=[]; err_dw=[]
+        for k in range(len(data_err)):
+            err_dw.append(data_err[k][0])
+            err_up.append(data_err[k][1])
+    
+    multlin=0
+    if ( type(y[0]) is np.ndarray) | ( type(y[0]) is list):
+        multlin=1
+    
+    if multlin & (not label):
+        label = [str(l) for l in np.arange(1,len(y)+1)]
+    elif not multlin:
+        label = [None]
+        x=[x]
+        y=[y]
+        if err_up: err_up = [err_up]
+        if err_dw: err_dw = [err_dw]
+
+    for k in range(len(y)):
+        if x[k] is None:
+            x[k] = np.arange(len(y[k]))*1
+
+    if (err_up is not None) & (err_dw is None):
+        err_dw = err_up
+
+    if np.isscalar(mode):
+        mode = [mode]
+    if multlin & (len(mode)==1):
+        mode *= len(y)
+
+    fig = plt.figure(figsize=[w/100, h/100])
+    
+    def plotfun(mode):
+        if mode.casefold()=='lines':
+            return plt.plot
+        elif mode.casefold()=='markers':
+            return plt.scatter
+        else:
+            print('MPlot mode error')
+
+    for i in np.arange(len(y)):
+        plot = plotfun(mode[i])
+        error_y = None
+        if abserr & (err_up is not None):
+            error_y=dict(type='data', 
+                         array=np.array(err_up[i])-np.array(y[i]), 
+                         arrayminus=np.array(y[i])-np.array(err_dw[i]), 
+                         visible=True)
+        elif (not abserr) & (err_up is not None):
+            error_y=dict(type='data', 
+                         array=err_up[i], 
+                         arrayminus=err_dw[i], 
+                         visible=True)
+        plot(x[i], y[i], label=label[i])#, error_y=error_y)#**kargs)
+
+    if showlegend & multlin:
+        plt.legend()       
+    plt.xlim(xlim)
+    plt.ylim(ylim)
+
+        # fig.update_layout(xaxis_title=xlabel,
+        #                   yaxis_title=ylabel,
+        #                   #legend_title="Legend Title",
+        #                   title=title,
+        #                   font=dict(
+        #                   #    family="Courier New, monospace",
+        #                       size=fontsize,
+        #                   #    color="RebeccaPurple"
+        #                   ),
+        #                   showlegend=showlegend 
+        #                  )
+        
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+
+    if showfigure:
+        plt.show()
+    else:
+        return fig
+    
+def MPlotShow():
+    plt.show()
+
