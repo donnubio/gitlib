@@ -10,8 +10,10 @@ import librosa
 import librosa.display
 
 import bokeh.plotting as bh
-from bokeh.io import output_notebook, save
+from bokeh.io import output_notebook, save, export_png, export_svg
 from bokeh.palettes import Dark2_5 as palette
+from bokeh.resources import CDN, INLINE
+from bokeh.embed import file_html
 import itertools
 output_notebook()
 
@@ -360,10 +362,12 @@ def BPlot(x=None,y=None,
           marker=None,
           xlim=[None,None], ylim=[None,None],
           sizing_mode="scale_width", legend_location=None, y_axis_type="auto",
+          filename=None,
           **kargs):
     
     '''
         legend_location: 'right', "top_left" ...
+        filename: '*.html', '*.png', '*.svg' (png,svg - pip install selenium)
     '''
   
     multlin=0
@@ -421,6 +425,24 @@ def BPlot(x=None,y=None,
 
     if (not multlin) | (not showlegend):
         fig.legend.visible=False
+
+    if filename:
+        ext = filename.split('.')[-1]
+        if ext.casefold()=='html':
+            #bh.output_file(filename=filename)
+            #bh.save(fig)
+            #html = file_html(p, CDN, "dat plot")
+            #html = file_html(p, (CDN,INLINE), "dat plot")
+            html =  file_html(fig, INLINE)
+            fhtml = open(filename,"w+")
+            fhtml.write(html)
+            fhtml.close()   
+            return
+        elif ext.casefold()=='png':
+            export_png(fig, filename=filename)
+        elif ext.casefold()=='svg':
+            export_svg(fig, filename=filename)
+
             
     bh.show(fig)
 
@@ -431,7 +453,13 @@ def PPlot(x=None, y=None,
           h=300, w=None, mode=["lines"], 
           data=None, data_err=None,
           xlabel=None, ylabel=None, title=None, fontsize=12, showlegend=True,
-          xlim=[None,None], ylim=[None,None]):
+          line_width=None,
+          xlim=[None,None], ylim=[None,None],
+          filename=None, **kargs):
+    
+    '''
+    filename: png, jpeg, webp, svg, pdf, eps (pip install kaleido)
+    '''
 
     if data:
         x=[]; y=[]
@@ -493,7 +521,9 @@ def PPlot(x=None, y=None,
                           ),
                           showlegend=showlegend 
                          )
-        
+    if filename:
+        fig.write_image(filename)
+
     fig.show()
 
 ################################################################################
@@ -504,7 +534,10 @@ def MPlot(x=None, y=None,
           xlim=[None,None], ylim=[None,None],
           data=None, data_err=None,
           xlabel=None, ylabel=None, title=None, fontsize=12, showlegend=True, 
-          showfigure=True):
+          showfigure=True, filename=None, **kargs):
+    '''
+    filename: png, ps, pdf, svg
+    '''
 
     if data:
         x=[]; y=[]
@@ -587,6 +620,9 @@ def MPlot(x=None, y=None,
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
+
+    if filename:
+        plt.savefig(filename)    
 
     if showfigure:
         plt.show()

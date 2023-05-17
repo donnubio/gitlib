@@ -130,8 +130,8 @@ get_hrvprms <- function(rr,
     LF_WL <- hd$FreqAnalysis[3][[1]]$LF
     HF_WL <- hd$FreqAnalysis[3][[1]]$HF
     LFHF_WL <- hd$FreqAnalysis[3][[1]]$LFHF
-    HFn_WL <- HF/(LF+HF)*100 #HFn <- HF/(TF-VLF)*100
-    LFn_WL <- LF/(LF+HF)*100 #LFn <- LF/(TF-VLF)*100
+    HFn_WL <- HF_WL/(LF_WL+HF_WL)*100 #HFn <- HF/(TF-VLF)*100
+    LFn_WL <- LF_WL/(LF_WL+HF_WL)*100 #LFn <- LF/(TF-VLF)*100
     T_WL <- hd$FreqAnalysis[3][[1]]$Time
 
     #########RES2###############
